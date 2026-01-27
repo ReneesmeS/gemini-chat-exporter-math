@@ -1,0 +1,28 @@
+{
+  "name": "gemini-chat-exporter",
+  "version": "1.0.0",
+  "description": "Chrome extension to export Gemini conversations to Markdown or Word with preserved formatting",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "echo \"Building extension...\" && npm run copy-libs",
+    "copy-libs": "mkdir -p libs && cp node_modules/docx/build/index.umd.js libs/docx.js && cp node_modules/katex/dist/katex.min.js libs/ && cp node_modules/katex/dist/katex.min.css libs/",
+    "package": "zip -r gemini-exporter.zip . -x 'node_modules/*' '.git/*' '*.zip' 'package-lock.json'",
+    "reload": "echo 'Open chrome://extensions/ and click the reload icon for Gemini Chat Exporter'"
+  },
+  "keywords": [
+    "chrome-extension",
+    "gemini",
+    "export",
+    "markdown",
+    "word",
+    "conversation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "docx": "^8.5.0",
+    "katex": "^0.16.9"
+  },
+  "devDependencies": {}
+}

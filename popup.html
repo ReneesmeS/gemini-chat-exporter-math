@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Chat Exporter</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="libs/katex.min.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Gemini Exporter</h1>
+      <p class="subtitle">Export your conversations with formatting preserved</p>
+    </header>
+
+    <div class="status" id="status">
+      <span class="status-icon">i</span>
+      <span class="status-text" id="statusText">Ready to export</span>
+    </div>
+
+    <div class="options">
+      <div class="option-group">
+        <h3>Export Scope</h3>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="scope" value="single" checked>
+            <span>Current Response</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="scope" value="all">
+            <span>Full Conversation</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="option-group">
+        <h3>Export Format</h3>
+        <div class="button-group">
+          <button class="format-btn" data-format="markdown">
+            <span class="icon">MD</span>
+            <span class="label">Markdown</span>
+            <span class="ext">.md</span>
+          </button>
+          <button class="format-btn" data-format="word">
+            <span class="icon">DOC</span>
+            <span class="label">Word</span>
+            <span class="ext">.docx</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="option-group">
+        <h3>Options</h3>
+        <label class="checkbox-label">
+          <input type="checkbox" id="includeTimestamp" checked>
+          <span>Include timestamp</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="includeMeta" checked>
+          <span>Include metadata</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <p><strong>Note:</strong> Math formulas and formatting will be preserved in all formats.</p>
+    </div>
+
+    <footer>
+      <div class="links">
+        <a href="#" id="helpLink">Help</a>
+        <span>•</span>
+        <a href="#" id="githubLink">GitHub</a>
+      </div>
+      <p class="version">v1.0.0</p>
+    </footer>
+  </div>
+
+  <!-- Load external libraries -->
+  <script src="libs/katex.min.js"></script>
+  <script src="libs/docx.js"></script>
+  
+  <!-- Load exporters as modules -->
+  <script type="module" src="exporters/markdown-exporter.js"></script>
+  <script type="module" src="exporters/word-exporter.js"></script>
+  
+  <!-- Load popup logic -->
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
