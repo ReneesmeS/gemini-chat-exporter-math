@@ -499,6 +499,47 @@ export class WordExporter {
 
     let clean = latex;
 
+    // DEGREE SYMBOL FIX
+    // Replace standalone ^\circ (not attached to a number/letter/group) with \degree for Word.
+    // Example: (^\circ) -> (\degree)
+    // Do not replace: 3^\circ, x^\circ, (x)^\circ, {x}^\circ
+    clean = clean.replace(/\^\s*\\circ\b/g, (match, offset, str) => {
+      let i = offset - 1;
+      while (i >= 0 && /\s/.test(str[i])) {
+        i--;
+      }
+
+      if (i < 0) {
+        return '\\degree';
+      }
+
+      const prev = str[i];
+      if (/[A-Za-z0-9}\])]/.test(prev)) {
+        return match;
+      }
+
+      return '\\degree';
+    });
+
+    // BAR FIX
+    // Replace empty \bar{} with \bar{\phantom{a}} to ensure Word preserves an overbar placeholder when no base is present.
+    clean = clean.replace(/\\bar\{\s*\}/g, "\\\\bar{\\\\phantom{a}}");
+
+    // TRAILING GREEK COMMAND FIX
+    // If a LaTeX string ends with a Greek command (e.g., "\\theta"), Word's math parser can sometimes drop it.
+    // Wrapping the trailing command in braces helps: "...\\theta" -> "...{\\theta}".
+    // Only applies at the end of the string (allowing trailing whitespace).
+    const greekCommands = [
+      'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
+      'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'omicron', 'pi', 'rho',
+      'sigma', 'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega',
+      'varpi', 'varrho', 'varsigma', 'varphi', 'varepsilon',
+      'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma',
+      'Upsilon', 'Phi', 'Psi', 'Omega'
+    ];
+    const trailingGreekPattern = new RegExp(`\\\\(?:${greekCommands.join('|')})(?:\\s*)$`);
+    clean = clean.replace(trailingGreekPattern, (match) => `{${match.trim()}}`);
+
     // 1. LIMIT FIX
     // Removes the space after \lim, \sup, \inf, etc. so Word groups them correctly.
     clean = clean.replace(/\\(lim|sup|inf|min|max|limsup|liminf)(_\{[^}]+\}|_\S)?\s+(?=\S)/g, "\\$1$2");
