@@ -542,10 +542,257 @@ export class WordExporter {
 
     // Fix \\tfrac -> \\frac
     clean = clean.replace(/\\tfrac\\b/g, "\\frac");
+
+    // QED FIX
+    // Map \square (often used as end-of-proof marker) to \qed for better compatibility.
+    clean = clean.replace(/\\square\b/g, "\\qed");
     
-    // 1. LIMIT FIX
-    // Removes the space after \lim, \sup, \inf, etc. so Word groups them correctly.
-    clean = clean.replace(/\\(lim|sup|inf|min|max|limsup|liminf)(_\{[^}]+\}|_\S)?\s+(?=\S)/g, "\\$1$2");
+    // 1. LIMIT/SUP/INF FIX
+    // Word can sometimes treat "\\lim a_n" as "lima_n" or fail to group the operator with its argument.
+    // Wrap the *immediate next LaTeX atom* in curly braces:
+    //   "\\lim a_n" or "\\lima_n" -> "\\lim{a_n}"
+    //   "\\lim \\frac{...}{...}" -> "\\lim{\\frac{...}{...}}"
+    // If the argument is already grouped ("{...}") or already parenthesized ("(... )" or "\\left(...\\right)"), leave it as-is.
+    clean = (() => {
+      const operatorNames = new Set(['limsup', 'liminf', 'lim', 'sup', 'inf', 'min', 'max']);
+
+      const isWhitespace = (ch) => /\s/.test(ch);
+      const isLetter = (ch) => /[A-Za-z]/.test(ch);
+
+      const parseCommandName = (s, i) => {
+        // s[i] must be '\\'
+        let j = i + 1;
+        while (j < s.length && isLetter(s[j])) {
+          j++;
+        }
+        return { name: s.slice(i + 1, j), end: j };
+      };
+
+      const parseBalanced = (s, i, openChar, closeChar) => {
+        // s[i] must be openChar
+        let depth = 0;
+        let j = i;
+        while (j < s.length) {
+          const ch = s[j];
+
+          // Skip escaped delimiters like \{ or \}
+          if (ch === '\\') {
+            const next = s[j + 1];
+            if (next === openChar || next === closeChar) {
+              j += 2;
+              continue;
+            }
+            // Skip command name so braces inside command names aren't misread.
+            const { end } = parseCommandName(s, j);
+            j = end;
+            continue;
+          }
+
+          if (ch === openChar) {
+            depth++;
+          } else if (ch === closeChar) {
+            depth--;
+            if (depth === 0) {
+              return { text: s.slice(i, j + 1), end: j + 1 };
+            }
+          }
+          j++;
+        }
+
+        // Unbalanced; return the rest as a best-effort atom.
+        return { text: s.slice(i), end: s.length };
+      };
+
+      const parseScriptItem = (s, i) => {
+        // Parse the thing after _ or ^.
+        if (i >= s.length) {
+          return { text: '', end: i };
+        }
+        if (s[i] === '{') {
+          return parseBalanced(s, i, '{', '}');
+        }
+        if (s[i] === '\\') {
+          const { end } = parseCommandName(s, i);
+          return { text: s.slice(i, end), end };
+        }
+        return { text: s[i], end: i + 1 };
+      };
+
+      const parseMathAtom = (s, i) => {
+        if (i >= s.length) {
+          return null;
+        }
+
+        const start = i;
+
+        // Groups
+        if (s[i] === '{') {
+          return parseBalanced(s, i, '{', '}');
+        }
+        if (s[i] === '(') {
+          return parseBalanced(s, i, '(', ')');
+        }
+        if (s[i] === '[') {
+          return parseBalanced(s, i, '[', ']');
+        }
+
+        // Commands (\frac, \sqrt, \alpha, ...)
+        if (s[i] === '\\') {
+          const { name, end } = parseCommandName(s, i);
+          let j = end;
+
+          const takeRequiredGroup = () => {
+            while (j < s.length && isWhitespace(s[j])) j++;
+            if (s[j] !== '{') return null;
+            const group = parseBalanced(s, j, '{', '}');
+            j = group.end;
+            return group;
+          };
+
+          if (name === 'frac' || name === 'dfrac' || name === 'tfrac') {
+            const g1 = takeRequiredGroup();
+            const g2 = takeRequiredGroup();
+            if (g1 && g2) {
+              return { text: s.slice(start, j), end: j };
+            }
+            return { text: s.slice(start, j), end: j };
+          }
+
+          if (name === 'sqrt') {
+            while (j < s.length && isWhitespace(s[j])) j++;
+            if (s[j] === '[') {
+              const opt = parseBalanced(s, j, '[', ']');
+              j = opt.end;
+            }
+            while (j < s.length && isWhitespace(s[j])) j++;
+            if (s[j] === '{') {
+              const rad = parseBalanced(s, j, '{', '}');
+              j = rad.end;
+            }
+            return { text: s.slice(start, j), end: j };
+          }
+
+          // Generic command: include an immediate braced group if present.
+          while (j < s.length && isWhitespace(s[j])) j++;
+          if (s[j] === '{') {
+            const arg = parseBalanced(s, j, '{', '}');
+            j = arg.end;
+          }
+
+          // Include any immediate scripts (_ / ^)
+          while (j < s.length && (s[j] === '_' || s[j] === '^')) {
+            const scriptStart = j;
+            j++;
+            const item = parseScriptItem(s, j);
+            j = item.end;
+            if (j === scriptStart + 1) break;
+          }
+
+          return { text: s.slice(start, j), end: j };
+        }
+
+        // Single variable/number token, plus immediate scripts
+        let j = i;
+        if (/[A-Za-z0-9]/.test(s[j])) {
+          j++;
+          while (j < s.length && /[A-Za-z0-9]/.test(s[j])) {
+            j++;
+          }
+        } else {
+          j++;
+        }
+
+        // Primes
+        while (j < s.length && s[j] === "'") {
+          j++;
+        }
+
+        while (j < s.length && (s[j] === '_' || s[j] === '^')) {
+          j++;
+          const item = parseScriptItem(s, j);
+          j = item.end;
+        }
+
+        return { text: s.slice(start, j), end: j };
+      };
+
+      const alreadyGroupedOrParenthesized = (s, i) => {
+        if (i >= s.length) return false;
+        if (s[i] === '{') return true;
+        if (s[i] === '(') return true;
+        if (s.startsWith('\\left(', i)) return true;
+        return false;
+      };
+
+      const wrapOperatorArgument = (s) => {
+        let i = 0;
+        let out = '';
+
+        while (i < s.length) {
+          if (s[i] !== '\\') {
+            out += s[i];
+            i++;
+            continue;
+          }
+
+          const { name, end } = parseCommandName(s, i);
+          if (!operatorNames.has(name)) {
+            out += s[i];
+            i++;
+            continue;
+          }
+
+          // Capture operator + optional subscript
+          let j = end;
+          if (s[j] === '_') {
+            const subStart = j;
+            j++;
+            const subItem = parseScriptItem(s, j);
+            j = subItem.end;
+            if (j === subStart + 1) {
+              j = subStart + 1;
+            }
+          }
+
+          let k = j;
+          while (k < s.length && isWhitespace(s[k])) k++;
+
+          // No argument to wrap
+          if (k >= s.length) {
+            out += s.slice(i, j);
+            i = j;
+            continue;
+          }
+
+          // Already grouped/parenthesized
+          if (alreadyGroupedOrParenthesized(s, k)) {
+            out += s.slice(i, k);
+            i = k;
+            continue;
+          }
+
+          const atom = parseMathAtom(s, k);
+          if (!atom || !atom.text) {
+            out += s.slice(i, j);
+            i = j;
+            continue;
+          }
+
+          let argText = atom.text;
+          // If atom is a single braced group, unwrap it to avoid \lim({x})
+          if (argText.startsWith('{') && argText.endsWith('}')) {
+            argText = argText.slice(1, -1);
+          }
+
+          out += `${s.slice(i, j)}{${argText}}`;
+          i = atom.end;
+        }
+
+        return out;
+      };
+
+      return wrapOperatorArgument(clean);
+    })();
 
     // 2. MODULO FIXES
     // Fix \pmod{n} -> (\text{mod } n)
