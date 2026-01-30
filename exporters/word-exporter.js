@@ -540,6 +540,9 @@ export class WordExporter {
     const trailingGreekPattern = new RegExp(`\\\\(?:${greekCommands.join('|')})(?:\\s*)$`);
     clean = clean.replace(trailingGreekPattern, (match) => `{${match.trim()}}`);
 
+    // Fix \\tfrac -> \\frac
+    clean = clean.replace(/\\tfrac\\b/g, "\\frac");
+    
     // 1. LIMIT FIX
     // Removes the space after \lim, \sup, \inf, etc. so Word groups them correctly.
     clean = clean.replace(/\\(lim|sup|inf|min|max|limsup|liminf)(_\{[^}]+\}|_\S)?\s+(?=\S)/g, "\\$1$2");
