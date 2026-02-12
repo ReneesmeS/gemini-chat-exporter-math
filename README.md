@@ -8,7 +8,7 @@ A Chrome extension that allows you to export your Gemini AI conversations to Mar
 
 ## Features
 
-- **Multiple Export Formats**: Export to Markdown (.md) or Word (.docx)
+- **Multiple Export Formats**: Export to Markdown (.md), LaTeX (.tex), or Word (.docx)
 - **In-Chat Export Button**: Export a specific response directly from the Gemini UI
 - **Math Formula Support**: Preserves KaTeX/LaTeX math formulas
 - **Complete Formatting**: Maintains bold, italic, code blocks, tables, lists, and more
@@ -135,6 +135,7 @@ npm run package
 
 #### Exporters
 - **Markdown Exporter**: Converts to clean Markdown syntax
+- **LaTeX Exporter**: Generates a standalone LaTeX document (.tex)
 - **Word Exporter**: Creates .docx files with docx library
 
 #### Background Worker (`background.js`)
@@ -165,6 +166,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 - **Gemini UI Changes**: Extension relies on Gemini's DOM structure; updates may be required if the Gemini UI changes.
 - **Large Conversations**: Very long conversations may take a few seconds to process
+- **Word Export (Minor Issues)**: Word export is usable but may still have small formatting/math edge-case bugs depending on the exact Gemini output.
 
 ## Roadmap
 

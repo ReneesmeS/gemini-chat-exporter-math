@@ -26,6 +26,7 @@ Each Gemini response includes an **Export** button next to the response actions.
 
 #### Export Format
 - **Markdown (.md)**: Plain text with formatting markup
+- **LaTeX (.tex)**: Standalone LaTeX document (ideal for academic writing and math)
 - **Word (.docx)**: Editable Microsoft Word document
 
 #### Options
@@ -93,6 +94,17 @@ This formula solves equations of the form $ax^2 + bx + c = 0$.
 - List formatting
 - Math formulas (as text notation)
 - Styles for easy reformatting
+
+**Note**: Word export is generally reliable, but there are still small edge-case bugs (especially around complex formatting and certain math constructs).
+
+### LaTeX Export
+
+**Best for**: Academic writing, math-heavy content, and publishing workflows
+
+**Features**:
+- Produces a standalone `.tex` file with a preamble (amsmath/hyperref/tabularx)
+- Preserves headings, lists, blockquotes, code blocks, tables
+- Exports inline and display math as LaTeX math (including inside headings when present in the extracted structure)
 
 **Use Cases**:
 - Add your own commentary

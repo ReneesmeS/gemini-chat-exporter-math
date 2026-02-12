@@ -56,7 +56,7 @@ export class WordExporter {
 
     // Add metadata header
     if (this.options.includeMeta) {
-      children.push(...this.generateHeader());
+      children.push(...await this.generateHeader());
     }
 
     // Process each message
@@ -87,7 +87,7 @@ export class WordExporter {
    * Generate header with metadata
    * @returns {Array} Array of paragraphs
    */
-  generateHeader() {
+  async generateHeader() {
     const { metadata } = this.data;
     const header = [];
 
@@ -115,11 +115,13 @@ export class WordExporter {
     }
 
     if (metadata.title && metadata.title !== 'Gemini Conversation') {
+      const titleInline = this.parseInlineLatexFromText(metadata.title);
+      const titleRuns = await this.processInlineContent(titleInline);
       header.push(
         new docx.Paragraph({
           children: [
             new docx.TextRun({ text: 'Title: ', bold: true }),
-            new docx.TextRun({ text: metadata.title })
+            ...titleRuns
           ],
           spacing: { after: 100 }
         })
@@ -139,6 +141,54 @@ export class WordExporter {
     header.push(this.createSeparator());
 
     return header;
+  }
+
+  parseInlineLatexFromText(text) {
+    if (text == null) return [{ type: 'text', text: '' }];
+    const s = String(text);
+    const parts = [];
+    let i = 0;
+
+    const pushText = (t) => {
+      if (t) parts.push({ type: 'text', text: t });
+    };
+
+    while (i < s.length) {
+      const nextDollar = s.indexOf('$', i);
+      if (nextDollar === -1) {
+        pushText(s.slice(i));
+        break;
+      }
+
+      pushText(s.slice(i, nextDollar));
+
+      // $$...$$ (math-block)
+      if (s[nextDollar + 1] === '$') {
+        const end = s.indexOf('$$', nextDollar + 2);
+        if (end === -1) {
+          // Unclosed, treat literally
+          pushText(s.slice(nextDollar));
+          break;
+        }
+        const latex = s.slice(nextDollar + 2, end);
+        parts.push({ type: 'math-block', latex });
+        i = end + 2;
+        continue;
+      }
+
+      // $...$ (math-inline)
+      const end = s.indexOf('$', nextDollar + 1);
+      if (end === -1) {
+        pushText(s.slice(nextDollar));
+        break;
+      }
+
+      const latex = s.slice(nextDollar + 1, end);
+      parts.push({ type: 'math-inline', latex });
+      i = end + 1;
+    }
+
+    return parts.length ? parts : [{ type: 'text', text: '' }];
   }
 
   /**
@@ -421,63 +471,97 @@ export class WordExporter {
       return [new docx.TextRun({ text: '' })];
     }
 
-    const runs = [];
+    const flatten = async (elements, style = {}) => {
+      const runs = [];
 
-    for (const element of content) {
-      if (element.type === 'math-block' && element.latex) {
-        const mathRun = this.createMathRun(element.latex);
-        runs.push(new docx.TextRun({ text: '', break: 1 }));
-        if (mathRun) {
-          runs.push(mathRun);
-        } else {
-          runs.push(new docx.TextRun({ text: element.latex }));
-        }
-        runs.push(new docx.TextRun({ text: '', break: 1 }));
-        continue;
-      }
-
-      if (element.type === 'math-inline' && element.latex) {
-        const mathRun = this.createMathRun(element.latex);
-        if (mathRun) {
-          runs.push(mathRun);
+      for (const element of elements) {
+        if (element?.type === 'math-block' && element.latex) {
+          const mathRun = this.createMathRun(element.latex);
+          runs.push(new docx.TextRun({ text: '', break: 1 }));
+          if (mathRun) {
+            runs.push(mathRun);
+          } else {
+            runs.push(new docx.TextRun({ text: element.latex }));
+          }
+          runs.push(new docx.TextRun({ text: '', break: 1 }));
           continue;
         }
+
+        if (element?.type === 'math-inline' && element.latex) {
+          const mathRun = this.createMathRun(element.latex);
+          if (mathRun) {
+            runs.push(mathRun);
+            continue;
+          }
+          // Fallback to text if Math isn't available.
+          runs.push(new docx.TextRun({
+            text: element.latex,
+            bold: style.bold,
+            italics: style.italics
+          }));
+          continue;
+        }
+
+        if (element?.type === 'bold') {
+          const inner = element.content && Array.isArray(element.content)
+            ? element.content
+            : [{ type: 'text', text: element.text || '' }];
+          const nested = await flatten(inner, { ...style, bold: true });
+          runs.push(...nested);
+          continue;
+        }
+
+        if (element?.type === 'italic') {
+          const inner = element.content && Array.isArray(element.content)
+            ? element.content
+            : [{ type: 'text', text: element.text || '' }];
+          const nested = await flatten(inner, { ...style, italics: true });
+          runs.push(...nested);
+          continue;
+        }
+
+        if (element?.type === 'link') {
+          const inner = element.content && Array.isArray(element.content)
+            ? element.content
+            : [{ type: 'text', text: element.text || '' }];
+          const linkRuns = await flatten(inner, style);
+          runs.push(...linkRuns);
+          if (element.href) {
+            runs.push(new docx.TextRun({
+              text: ` (${element.href})`,
+              bold: style.bold,
+              italics: style.italics
+            }));
+          }
+          continue;
+        }
+
+        const options = { text: '' };
+        options.bold = style.bold;
+        options.italics = style.italics;
+
+        switch (element?.type) {
+          case 'text':
+            options.text = element.text;
+            break;
+
+          case 'code':
+            options.text = element.text;
+            options.font = 'Courier New';
+            options.shading = { fill: 'F5F5F5' };
+            break;
+
+          default:
+            options.text = element?.text || '';
+        }
+
+        runs.push(new docx.TextRun(options));
       }
 
-      const options = { text: '' };
+      return runs;
+    };
 
-      switch (element.type) {
-        case 'text':
-          options.text = element.text;
-          break;
-
-        case 'bold':
-          options.text = element.text;
-          options.bold = true;
-          break;
-
-        case 'italic':
-          options.text = element.text;
-          options.italics = true;
-          break;
-
-        case 'code':
-          options.text = element.text;
-          options.font = 'Courier New';
-          options.shading = { fill: 'F5F5F5' };
-          break;
-
-        case 'link':
-          options.text = element.href ? `${element.text} (${element.href})` : element.text;
-          break;
-
-        default:
-          options.text = element.text || '';
-      }
-
-      runs.push(new docx.TextRun(options));
-    }
-
+    const runs = await flatten(content);
     return runs.length ? runs : [new docx.TextRun({ text: '' })];
   }
 

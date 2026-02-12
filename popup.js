@@ -5,6 +5,7 @@
 
 import { MarkdownExporter } from './exporters/markdown-exporter.js';
 import { WordExporter } from './exporters/word-exporter.js';
+import { LatexExporter } from './exporters/latex-exporter.js';
 
 document.addEventListener('DOMContentLoaded', function() {
   const formatButtons = document.querySelectorAll('.format-btn');
@@ -78,6 +79,11 @@ document.addEventListener('DOMContentLoaded', function() {
             case 'word':
               result = await WordExporter.exportToWord(response.data, options);
               await downloadBlob(result.blob, result.filename);
+              break;
+
+            case 'latex':
+              result = LatexExporter.exportToLatex(response.data, options);
+              await downloadFile(result.content, result.filename, result.mimeType);
               break;
             
             default:

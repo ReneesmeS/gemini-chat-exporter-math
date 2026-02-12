@@ -46,6 +46,8 @@ Or manually create 3 simple PNG files (16x16, 48x48, 128x128) and place them in 
 3. Click the extension icon in your toolbar
 4. Choose a format and click to export
 
+Supported formats: Markdown (.md), LaTeX (.tex), Word (.docx)
+
 ## Project Structure
 
 ```

@@ -193,10 +193,10 @@
       return excludeSelectors.some(selector => node.matches(selector));
     };
 
-    const walk = (node) => {
+    const walk = (node, target) => {
       if (node.nodeType === Node.TEXT_NODE) {
         if (node.textContent) {
-          content.push({
+          target.push({
             type: 'text',
             text: node.textContent
           });
@@ -211,14 +211,14 @@
       const tagName = node.tagName.toLowerCase();
 
       if (tagName === 'br') {
-        content.push({ type: 'text', text: '\n' });
+        target.push({ type: 'text', text: '\n' });
         return;
       }
 
       if (tagName === 'div' && node.classList.contains('math-block')) {
         const latex = node.getAttribute('data-math');
         if (latex) {
-          content.push({
+          target.push({
             type: 'math-block',
             latex
           });
@@ -229,7 +229,7 @@
       if (tagName === 'span' && node.classList.contains('math-inline')) {
         const latex = node.getAttribute('data-math');
         if (latex) {
-          content.push({
+          target.push({
             type: 'math-inline',
             latex
           });
@@ -237,47 +237,59 @@
         return;
       }
 
+      // Skip KaTeX render spans; we export from data-math wrappers.
+      if (tagName === 'span' && node.classList.contains('katex')) {
+        return;
+      }
+
       switch (tagName) {
         case 'b':
-        case 'strong':
-          content.push({
+        case 'strong': {
+          const inner = [];
+          node.childNodes.forEach(child => walk(child, inner));
+          target.push({
             type: 'bold',
-            text: node.textContent
+            text: node.textContent,
+            content: inner
           });
           return;
+        }
         case 'i':
-        case 'em':
-          content.push({
+        case 'em': {
+          const inner = [];
+          node.childNodes.forEach(child => walk(child, inner));
+          target.push({
             type: 'italic',
-            text: node.textContent
+            text: node.textContent,
+            content: inner
           });
           return;
+        }
         case 'code':
           if (!node.closest('.math-inline')) {
-            content.push({
+            target.push({
               type: 'code',
               text: node.textContent
             });
           }
           return;
-        case 'a':
-          content.push({
+        case 'a': {
+          const inner = [];
+          node.childNodes.forEach(child => walk(child, inner));
+          target.push({
             type: 'link',
             text: node.textContent,
-            href: node.href
+            href: node.href,
+            content: inner
           });
           return;
-        case 'span':
-          if (node.classList.contains('katex')) {
-            return;
-          }
-          break;
+        }
       }
 
-      node.childNodes.forEach(child => walk(child));
+      node.childNodes.forEach(child => walk(child, target));
     };
 
-    element.childNodes.forEach(child => walk(child));
+    element.childNodes.forEach(child => walk(child, content));
     return content;
   }
 
@@ -591,8 +603,18 @@
       closeAllExportMenus();
     });
 
+    const latexButton = document.createElement('button');
+    latexButton.type = 'button';
+    latexButton.textContent = 'Export LaTeX (.tex)';
+    latexButton.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      await handleInChatExport(messageElement, 'latex');
+      closeAllExportMenus();
+    });
+
     menu.appendChild(markdownButton);
     menu.appendChild(wordButton);
+    menu.appendChild(latexButton);
 
     return menu;
   }
@@ -694,6 +716,10 @@
         const { WordExporter } = await import(chrome.runtime.getURL('exporters/word-exporter.js'));
         const result = await WordExporter.exportToWord(data, options);
         await downloadBlob(result.blob, result.filename);
+      } else if (format === 'latex') {
+        const { LatexExporter } = await import(chrome.runtime.getURL('exporters/latex-exporter.js'));
+        const result = LatexExporter.exportToLatex(data, options);
+        await downloadFile(result.content, result.filename, result.mimeType);
       } else {
         throw new Error(`Unsupported export format: ${format}`);
       }

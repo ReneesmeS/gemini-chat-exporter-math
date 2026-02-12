@@ -242,16 +242,16 @@ export class MarkdownExporter {
           return element.text;
 
         case 'bold':
-          return `**${element.text}**`;
+          return `**${element.content ? this.processInlineContent(element.content) : element.text}**`;
 
         case 'italic':
-          return `*${element.text}*`;
+          return `*${element.content ? this.processInlineContent(element.content) : element.text}*`;
 
         case 'code':
           return `\`${element.text}\``;
 
         case 'link':
-          return `[${element.text}](${element.href})`;
+          return `[${element.content ? this.processInlineContent(element.content) : element.text}](${element.href})`;
 
         case 'math-inline':
           return `$${element.latex}$`;

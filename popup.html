@@ -47,6 +47,11 @@
             <span class="label">Word</span>
             <span class="ext">.docx</span>
           </button>
+          <button class="format-btn" data-format="latex">
+            <span class="icon">TEX</span>
+            <span class="label">LaTeX</span>
+            <span class="ext">.tex</span>
+          </button>
         </div>
       </div>
 
@@ -84,6 +89,7 @@
   <!-- Load exporters as modules -->
   <script type="module" src="exporters/markdown-exporter.js"></script>
   <script type="module" src="exporters/word-exporter.js"></script>
+  <script type="module" src="exporters/latex-exporter.js"></script>
   
   <!-- Load popup logic -->
   <script type="module" src="popup.js"></script>

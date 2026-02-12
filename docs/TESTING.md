@@ -67,10 +67,13 @@ Before committing changes:
 
 ### Export Formats
 - [ ] Markdown export works
+- [ ] LaTeX export works
 - [ ] Word export works
 - [ ] Files download with correct names
 - [ ] Formatting preserved in each format
 - [ ] Math formulas preserved
+
+Note: Word export may still have small edge-case issues; validate especially complex math and deeply nested formatting.
 
 ### Edge Cases
 - [ ] Empty conversation
